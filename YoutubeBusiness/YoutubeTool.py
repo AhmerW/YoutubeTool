@@ -22,32 +22,7 @@ from tkinter import (
     
     
 )
-"""
-TO - DO 
 
-#three classes
-    login
-    Downloader
-    MainWindow
-    
-Tkinter:
-    Login??
-    ------
-    Color:
-        Red / Orange - ish
-        
-    ProgressBar?
-    
-    FirstFrame:
-        OneEntry -> inputs the youtube video
-        
-        Buttons:
-            "Download Youtube video"
-            "Download playlist?"
-                -> Opens a new window 'options??' -> choose resultion etc
-                -> have a check "automatically download highest resolution?"
-                
-"""
 
 class Login(object):
     def __new__(self):
@@ -68,14 +43,11 @@ class Downloader(object):
             data = str(r.text).split('\n')
             for value in data:
                 host, port = value.split(':')
-                self.proxies[host] = port
-            
+                self.proxies[host] = port      
         except:
             pass
         
     def download(self, video, use_highest=True):
-
-
         title = video.title
         if not title.endswith('.mp4'):
             check_title = str(title)+".mp4"
@@ -86,19 +58,19 @@ class Downloader(object):
         status = True 
         try:
             if use_highest:
-                _ = video.streams.get_highest_resolution().download(self.download_path, title)
+                video.streams.get_highest_resolution().download(self.download_path, title)
             else:
-                _ = video.streams[0].download(self.download_path, title)
-                
-    
+                video.streams[0].download(self.download_path, title)
         except Exception as e:
             print(e)
             status = False
-            
         return [title, status, "none", "none"]
     
-    def downloadVideo(self, _path, use_highest=True, playlist=False):
+    def downloadVideo(self, _path, use_highest=True, playlist=False, obj=None):
+        obj.progress_bar["value"] += 5
+        obj.master.update()
         if not self.got_proxies:
+            self.got_proxies = True
             self.get_proxies()
         if os.path.isfile(_path):
             try:
@@ -109,7 +81,8 @@ class Downloader(object):
             link = [str(_path)]
           
         result = []
-
+        obj.progress_bar["value"] += 5
+        obj.master.update()
         for _link in link:
             try:
                 if playlist:
@@ -126,7 +99,8 @@ class Downloader(object):
             except Exception as e:
                 print(e)
                 result.append([_link, False, None, 0])
-
+        obj.progress_bar["value"] += 50
+        obj.master.update()
         return result
 
 
@@ -135,7 +109,7 @@ class MainWindow(object):
         #downloader obj
         self.downloader = Downloader()
         #time launched at
-        self.started_at = datetime.now()
+        self.started_at = datetime.now().strftime('%c')
         
         #window object 
         self.master = Tk()
@@ -167,13 +141,18 @@ class MainWindow(object):
     
     def start_downloading(self, playlist=False):
         data = str(self.entry_main.get()).strip()
+        if data == "Type in link to a video, playlist or a txt file" or data == "":
+            return 
+        self.progress_bar["value"] += 10
         self.entry_main.delete(0, END)
         
         result = self.downloader.downloadVideo(
             data, 
             use_highest=bool(self.download_highest_resolution),
-            playlist=playlist
+            playlist=playlist,
+            obj=self
         )
+        
         
         for value in result:
             value, status, _, _ = value
@@ -181,29 +160,36 @@ class MainWindow(object):
                 self.current_y = 425
                 self.current_x += 150
             color = self.rgb((0, 200, 0))
+            text = "Downloaded: "
             if not status:
                 color = self.rgb((200, 0, 0))
+                text = "Error, could not download: "
+            
             label = Label(
                 self.master, 
-                text=f"[{self.total_downloads}] Downloaded: {value}",
+                text=f"[{self.total_downloads}] {text} {value}",
                 bg=color,
                 fg=self.rgb((0, 0, 0))
-                )
+            )
             
             label.place(
                 x=self.current_x,
                 y=self.current_y
             )
             
-            
-            
             self.current_y += 35
             self.total_downloads += 1
             self.downloaded_now_labels.append(label)
             
+        if not status:
+            self.progress_bar["value"] = 0
+        else:
+            self.progress_bar["value"] = 100
+            
     def clear_current_downloads(self):
         self.current_x = 0
-        self.current_y = 425
+        self.current_y = 435
+        self.progress_bar["value"] = 0
         for label in self.downloaded_now_labels:
             label.destroy()
             
@@ -238,8 +224,14 @@ class MainWindow(object):
             bg='#bab7b5',
             command=self.clear_current_downloads
         )
-        
         _clear.place(x=0, y=150, width=300, height=50)
+        
+        launched_at = Label(
+            top,
+            text=f"Launched at: {self.started_at}",
+            bg='#bab7b5'
+        )
+        launched_at.place(x=0, y=250, width=300, height=50)
 
         top.mainloop()
     
@@ -248,7 +240,8 @@ class MainWindow(object):
             self.entry_main.configure(state=NORMAL)
             self.entry_main.unbind('<Button-1>', self.on_click_id)
             self.entry_main.delete(0, END)
-        except:
+        except Exception as e:
+            print(e)
             pass
         
     def enter_button(self, event = None): self.button_downloadVideo.configure(bg=self.rgb((255, 0, 0)))
@@ -263,7 +256,7 @@ class MainWindow(object):
             bg=self.rgb((255, 0, 0)),
 
         )
-        self.entry_main.insert(0, "Type in a link to video, playlist or a txt file")
+        self.entry_main.insert(0, "Type in link to a video, playlist or a txt file")
         self.entry_main.configure(state=DISABLED)
         self.on_click_id = self.entry_main.bind('<Button-1>', self.enable_entry)
         
@@ -275,6 +268,12 @@ class MainWindow(object):
             text="Settings",
             bg='#bab7b5',
             command=self.show_settings
+        )
+        self.button_exit = Button(
+            self.master,
+            text="Exit",
+            bg='#bab7b5',
+            command=self.master.destroy
         )
         
         self.button_downloadVideo = Button(
@@ -300,10 +299,24 @@ class MainWindow(object):
         
         self.current_downloads = Label(
             self.master,
-            bg=self.rgb((0, 0, 0)),
-            fg=self.rgb((0, 255, 0))
+            bg=self.rgb((0, 0, 0))
             
         )
+        self._text_label = Label(
+            self.master, 
+            text="Current downloads", 
+            fg=self.rgb((0, 255, 0)),
+            bg=self.rgb((0, 0, 0))
+        )
+        
+        self.progress_bar = ttk.Progressbar(
+            self.master,
+            orient=HORIZONTAL,
+            length=300,
+            mode='determinate'
+            
+        )
+        
     
     def _place_all_widgets(self):
         ## ENTRIES 
@@ -318,10 +331,17 @@ class MainWindow(object):
         
         #settings button
         self.button_settings.place(
-            x=650,
+            x=620,
             y=00,
             height=20,
-            width=150
+            width=200
+        )
+        #exit button
+        self.button_exit.place(
+            x=550,
+            y=00,
+            height=20,
+            width=100
         )
         
         #download video button
@@ -343,10 +363,25 @@ class MainWindow(object):
         self.current_downloads.place(
             x=0, 
             y=self.current_y,
-            height=20,
+            height=30,
             width=900
         )
-        self.current_y += 25
+        
+        self._text_label.place(
+            x=0,
+            y=self.current_y,
+            height=30,
+            width=120
+        )
+
+        self.progress_bar.place(
+            x=0, 
+            y=360,
+            height=30,
+            width=900
+        )
+        
+        self.current_y += 30
     
     def start_and_run(self):
         self._create_widgets()
