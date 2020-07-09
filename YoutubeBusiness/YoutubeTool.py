@@ -19,8 +19,6 @@ from tkinter import (
     END,
     NORMAL,
     DISABLED
-    
-    
 )
 
 
@@ -33,9 +31,7 @@ class Downloader(object):
         self.download_path = os.path.join(os.getcwd(), 'downloads')
         self.got_proxies = False 
         
-        self.proxies = {
-            
-        }
+        self.proxies = {}
     
     def get_proxies(self):
         try:
